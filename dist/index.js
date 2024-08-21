@@ -38,6 +38,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const bodyParser = __importStar(require("body-parser"));
 const mongoose_1 = __importDefault(require("mongoose"));
+const express_session_1 = __importDefault(require("express-session"));
+const passport_1 = __importDefault(require("passport"));
+const passport_google_oauth20_1 = require("passport-google-oauth20");
 const authy_sdk_1 = __importDefault(require("@splitbitio/authy-sdk"));
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -67,17 +70,51 @@ function main() {
         const port = process.env.PORT || 8080;
         const splitAuth = new authy_sdk_1.default({
             dbInstance: dbInstance,
-            secretString: "4c546dcc99cfef22ac8a26ae1a7a09de",
+            secretString: "ddr66ghdgseert34546",
             emailVerification: false,
             collection: "users",
             gmailCredentials: {
-                clientId: "970867642182-n9t51fivf5b05om5m1tdmnch606lf6ce.apps.googleusercontent.com",
-                clientSecret: "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",
+                clientId: "874739149153-g4nv5hn51i8ol3md3lcrokmctlt46872.apps.googleusercontent.com",
+                clientSecret: "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",
                 refreshToken: "1//04R7pwUUAfsVTCgYIARAAGAQSNwF-L9IrB6s3uKheWqjvjnjcflJYeJtwHTggTsGk3QO0kaBruBh9fYGrbwWEpq5MLJJDWtgBgx4",
             },
         });
+        passport_1.default.use(new passport_google_oauth20_1.Strategy({
+            clientID: splitAuth.gmailCredentials.clientId,
+            clientSecret: splitAuth.gmailCredentials.clientSecret,
+            callbackURL: 'http://localhost:8080/auth/google/callback'
+        }, (accessToken, refreshToken, profile, done) => __awaiter(this, void 0, void 0, function* () {
+            console.log(profile);
+            try {
+                const user = yield splitAuth.googleSignInOrSignup(profile);
+                return done(null, user);
+            }
+            catch (error) {
+                return done(error);
+            }
+        })));
+        passport_1.default.serializeUser((user, done) => {
+            done(null, user);
+        });
+        passport_1.default.deserializeUser((obj, done) => {
+            done(null, obj);
+        });
+        app.use((0, express_session_1.default)({
+            secret: 'fghj',
+            resave: false,
+            saveUninitialized: true
+        }));
+        app.use(passport_1.default.initialize());
+        app.use(passport_1.default.session());
         app.use(bodyParser.json());
         app.use(express_1.default.json());
+        app.get("/auth/google", passport_1.default.authenticate("google", { scope: ["profile", "email"] }));
+        app.get("/auth/google/callback", passport_1.default.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
+            res.redirect("/profile");
+        });
+        app.get('/profile', function (req, res) {
+            res.send('hi');
+        });
         app.post("/signup", (req, res) => __awaiter(this, void 0, void 0, function* () {
             const response = yield splitAuth.signup(req.body);
             res.send(response);

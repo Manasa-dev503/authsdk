@@ -1,8 +1,10 @@
 import express from 'express';
 import * as bodyParser from "body-parser";
 import mongoose from 'mongoose';
+import session from 'express-session';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import SplitAuth from '@splitbitio/authy-sdk';
-
 
 async function main() {
     const connectionString =
@@ -43,19 +45,65 @@ async function main() {
     const port = process.env.PORT || 8080;
     const splitAuth = new SplitAuth({
         dbInstance: dbInstance,
-        secretString: "4c546dcc99cfef22ac8a26ae1a7a09de",
+        secretString: "ddr66ghdgseert34546",
         emailVerification: false,
         collection: "users",
         gmailCredentials: {
             clientId:
-                "970867642182-n9t51fivf5b05om5m1tdmnch606lf6ce.apps.googleusercontent.com",
-            clientSecret: "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",
+                "874739149153-g4nv5hn51i8ol3md3lcrokmctlt46872.apps.googleusercontent.com",
+            clientSecret: "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",
             refreshToken:
                 "1//04R7pwUUAfsVTCgYIARAAGAQSNwF-L9IrB6s3uKheWqjvjnjcflJYeJtwHTggTsGk3QO0kaBruBh9fYGrbwWEpq5MLJJDWtgBgx4",
         },
     });
+
+    passport.use(new GoogleStrategy({
+        clientID : splitAuth.gmailCredentials.clientId,
+        clientSecret : splitAuth.gmailCredentials.clientSecret,
+        callbackURL : 'http://localhost:8080/auth/google/callback'
+    },
+    async (accessToken,refreshToken,profile,done) => {
+        console.log(profile)
+        try {
+            const user = await splitAuth.googleSignInOrSignup(profile);
+            return done(null, user);
+        } catch (error){
+            return done(error)
+        }
+    }))
+    passport.serializeUser((user,done)=>{
+        done(null,user)
+    })
+    passport.deserializeUser((obj, done) => {
+        done(null, obj);
+    });
+   
+    app.use(session({
+        secret: 'fghj',
+        resave: false,
+        saveUninitialized: true
+      }));
+    
+    app.use(passport.initialize());
+    app.use(passport.session());
+    
     app.use(bodyParser.json());
     app.use(express.json());
+
+    app.get("/auth/google",
+        passport.authenticate("google", { scope: ["profile", "email"] })
+    );
+
+    app.get("/auth/google/callback",
+        passport.authenticate("google", { failureRedirect: "/login" }),
+        (req, res) => {
+            res.redirect("/profile");
+        }
+    );
+
+    app.get('/profile',function(req,res){
+        res.send('hi')
+    })
 
     app.post("/signup", async (req, res) => {
         const response = await splitAuth.signup(req.body);
