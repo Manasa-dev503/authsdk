@@ -41,13 +41,18 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const express_session_1 = __importDefault(require("express-session"));
 const passport_1 = __importDefault(require("passport"));
 const passport_google_oauth20_1 = require("passport-google-oauth20");
+const dotenv_1 = __importDefault(require("dotenv"));
 const authy_sdk_1 = __importDefault(require("@splitbitio/authy-sdk"));
+dotenv_1.default.config();
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
-        const connectionString = "mongodb://127.0.0.1:27017";
+        const connectionString = process.env.DB_CONNECTION_STRING || "mongodb://127.0.0.1:27017";
+        const dbName = process.env.DB_NAME || "auth-sdk";
+        const secretString = process.env.SECRET_STRING || "defaultSecret";
         const dbInstance = yield new Promise((resolve, reject) => {
             const db = mongoose_1.default.createConnection(connectionString, {
-                dbName: "auth-sdk",
+                dbName: dbName,
+                serverSelectionTimeoutMS: 30000
             });
             db.on("error", function (error) {
                 console.log(`MongoDB :: connection  ${JSON.stringify(error)}`);
@@ -70,19 +75,19 @@ function main() {
         const port = process.env.PORT || 8080;
         const splitAuth = new authy_sdk_1.default({
             dbInstance: dbInstance,
-            secretString: "ddr66ghdgseert34546",
+            secretString: secretString,
             emailVerification: false,
             collection: "users",
             gmailCredentials: {
-                clientId: "874739149153-g4nv5hn51i8ol3md3lcrokmctlt46872.apps.googleusercontent.com",
-                clientSecret: "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",
-                refreshToken: "1//04R7pwUUAfsVTCgYIARAAGAQSNwF-L9IrB6s3uKheWqjvjnjcflJYeJtwHTggTsGk3QO0kaBruBh9fYGrbwWEpq5MLJJDWtgBgx4",
+                clientId: process.env.GOOGLE_CLIENT_ID,
+                clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+                refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
             },
         });
         passport_1.default.use(new passport_google_oauth20_1.Strategy({
             clientID: splitAuth.gmailCredentials.clientId,
             clientSecret: splitAuth.gmailCredentials.clientSecret,
-            callbackURL: 'http://localhost:8080/auth/google/callback'
+            callbackURL: '/auth/google/callback'
         }, (accessToken, refreshToken, profile, done) => __awaiter(this, void 0, void 0, function* () {
             console.log(profile);
             try {
@@ -111,9 +116,6 @@ function main() {
         app.get("/auth/google", passport_1.default.authenticate("google", { scope: ["profile", "email"] }));
         app.get("/auth/google/callback", passport_1.default.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
             res.redirect("/profile");
-        });
-        app.get('/profile', function (req, res) {
-            res.send('hi');
         });
         app.post("/signup", (req, res) => __awaiter(this, void 0, void 0, function* () {
             const response = yield splitAuth.signup(req.body);

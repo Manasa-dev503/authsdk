@@ -4,15 +4,20 @@ import mongoose from 'mongoose';
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import dotenv from 'dotenv';
 import SplitAuth from '@splitbitio/authy-sdk';
+dotenv.config();
 
 async function main() {
-    const connectionString =
-        "mongodb://127.0.0.1:27017";
+    const connectionString = process.env.DB_CONNECTION_STRING || "mongodb://127.0.0.1:27017";
+    const dbName = process.env.DB_NAME || "auth-sdk";
+    const secretString = process.env.SECRET_STRING || "defaultSecret";
+
     const dbInstance: mongoose.Connection = await new Promise(
         (resolve, reject) => {
             const db = mongoose.createConnection(connectionString, {
-                dbName: "auth-sdk",
+                dbName: dbName,
+                serverSelectionTimeoutMS: 30000
             });
 
             db.on("error", function (error) {
@@ -45,22 +50,20 @@ async function main() {
     const port = process.env.PORT || 8080;
     const splitAuth = new SplitAuth({
         dbInstance: dbInstance,
-        secretString: "ddr66ghdgseert34546",
+        secretString: secretString,
         emailVerification: false,
         collection: "users",
         gmailCredentials: {
-            clientId:
-                "874739149153-g4nv5hn51i8ol3md3lcrokmctlt46872.apps.googleusercontent.com",
-            clientSecret: "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",
-            refreshToken:
-                "1//04R7pwUUAfsVTCgYIARAAGAQSNwF-L9IrB6s3uKheWqjvjnjcflJYeJtwHTggTsGk3QO0kaBruBh9fYGrbwWEpq5MLJJDWtgBgx4",
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            refreshToken: process.env.GOOGLE_REFRESH_TOKEN!,
         },
     });
 
     passport.use(new GoogleStrategy({
         clientID : splitAuth.gmailCredentials.clientId,
         clientSecret : splitAuth.gmailCredentials.clientSecret,
-        callbackURL : 'http://localhost:8080/auth/google/callback'
+        callbackURL : '/auth/google/callback'
     },
     async (accessToken,refreshToken,profile,done) => {
         console.log(profile)
@@ -71,7 +74,7 @@ async function main() {
             return done(error)
         }
     }))
-    passport.serializeUser((user,done)=>{
+     passport.serializeUser((user,done)=>{
         done(null,user)
     })
     passport.deserializeUser((obj, done) => {
@@ -101,16 +104,13 @@ async function main() {
         }
     );
 
-    app.get('/profile',function(req,res){
-        res.send('hi')
-    })
-
     app.post("/signup", async (req, res) => {
         const response = await splitAuth.signup(req.body);
         res.send(response);
     });
     app.post("/login", async (req, res) => {
         const response = await splitAuth.login(req.body);
+        
         res.send(response);
     });
 
