@@ -12,7 +12,7 @@ import UserModel from './models/UserModel';
 dotenv.config();
 
 async function main() {
-    const connectionString = process.env.DB_CONNECTION_STRING || "mongodb://127.0.0.1:27017";
+    const connectionString = process.env.DB_CONNECTION_STRING || "mongodb+srv://admin:cdkpiLdQgBLwnnc7@cluster0.biojw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
     const dbName = process.env.DB_NAME || "auth-sdk";
     const secretString = process.env.SECRET_STRING || "defaultSecret";
 
