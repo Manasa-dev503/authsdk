@@ -106,6 +106,6 @@
     "skipLibCheck": true  ,                               /* Skip type checking all .d.ts files. */
     "outDir": "dist"
   },
-  "include": ["**/*"] /* Concatenate and emit output to single file. */
+  "include": ["**/*", "models"] /* Concatenate and emit output to single file. */
 
 }

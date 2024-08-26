@@ -6,6 +6,9 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import dotenv from 'dotenv';
 import SplitAuth from '@splitbitio/authy-sdk';
+import UserModel from './models/UserModel';
+
+
 dotenv.config();
 
 async function main() {
@@ -17,7 +20,7 @@ async function main() {
         (resolve, reject) => {
             const db = mongoose.createConnection(connectionString, {
                 dbName: dbName,
-                serverSelectionTimeoutMS: 30000
+                serverSelectionTimeoutMS:10000
             });
 
             db.on("error", function (error) {
@@ -46,6 +49,7 @@ async function main() {
             });
         }
     );
+
     const app = express();
     const port = process.env.PORT || 8080;
     const splitAuth = new SplitAuth({
@@ -61,35 +65,49 @@ async function main() {
     });
 
     passport.use(new GoogleStrategy({
-        clientID : splitAuth.gmailCredentials.clientId,
-        clientSecret : splitAuth.gmailCredentials.clientSecret,
-        callbackURL : '/auth/google/callback'
+        clientID: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        callbackURL: 'http://localhost:8080/auth/googleauth'
     },
-    async (accessToken,refreshToken,profile,done) => {
-        console.log(profile)
+    async (accessToken, refreshToken, profile, done) => {
+      //  console.log(profile)
         try {
-            const user = await splitAuth.googleSignInOrSignup(profile);
+           // console.log("model",UserModel.findOne({googleId: profile.id}).exec())
+           const user = UserModel.findOne({ email: profile.emails[0].value }).exec()
+           console.log("user found::",user)
+            if (!user) {
+                const newUser = new UserModel({
+                    googleId: profile.id,
+                    name: profile.displayName,
+                    email: profile.emails[0].value
+                });
+                 newUser.save();
+                return done(null, newUser);
+            }
             return done(null, user);
-        } catch (error){
-            return done(error)
+        } catch (err) {
+            console.error(err);
+            return done(err);
         }
-    }))
-     passport.serializeUser((user,done)=>{
-        done(null,user)
-    })
+    }));
+
+    passport.serializeUser((user, done) => {
+        done(null, user);
+    });
+
     passport.deserializeUser((obj, done) => {
         done(null, obj);
     });
-   
+
     app.use(session({
-        secret: 'fghj',
+        secret: secretString,
         resave: false,
         saveUninitialized: true
-      }));
-    
+    }));
+
     app.use(passport.initialize());
     app.use(passport.session());
-    
+
     app.use(bodyParser.json());
     app.use(express.json());
 
@@ -97,24 +115,27 @@ async function main() {
         passport.authenticate("google", { scope: ["profile", "email"] })
     );
 
-    app.get("/auth/google/callback",
+    app.get("/auth/googleauth",
         passport.authenticate("google", { failureRedirect: "/login" }),
         (req, res) => {
             res.redirect("/profile");
         }
     );
 
+    app.get("/profile",function(req,res){
+        res.send("Welcome to dashboard")
+    })
     app.post("/signup", async (req, res) => {
         const response = await splitAuth.signup(req.body);
         res.send(response);
     });
+
     app.post("/login", async (req, res) => {
         const response = await splitAuth.login(req.body);
-        
         res.send(response);
     });
 
- app.post("/forgot-password", async (req, res) => {
+    app.post("/forgot-password", async (req, res) => {
         const response = await splitAuth.forgotPassword(req.body);
         res.send(response);
     });
@@ -124,9 +145,8 @@ async function main() {
         res.send(response);
     });
 
-    app.get(
-        "/data",
-        [(req, res, next) => splitAuth.authenticate(req, res, next)],
+    app.get("/data",
+        (req, res, next) => splitAuth.authenticate(req, res, next),
         async (req, res) => {
             res.send("ok");
         }

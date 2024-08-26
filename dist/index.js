@@ -43,6 +43,7 @@ const passport_1 = __importDefault(require("passport"));
 const passport_google_oauth20_1 = require("passport-google-oauth20");
 const dotenv_1 = __importDefault(require("dotenv"));
 const authy_sdk_1 = __importDefault(require("@splitbitio/authy-sdk"));
+const UserModel_1 = __importDefault(require("./models/UserModel"));
 dotenv_1.default.config();
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -52,7 +53,7 @@ function main() {
         const dbInstance = yield new Promise((resolve, reject) => {
             const db = mongoose_1.default.createConnection(connectionString, {
                 dbName: dbName,
-                serverSelectionTimeoutMS: 30000
+                serverSelectionTimeoutMS: 10000
             });
             db.on("error", function (error) {
                 console.log(`MongoDB :: connection  ${JSON.stringify(error)}`);
@@ -85,17 +86,29 @@ function main() {
             },
         });
         passport_1.default.use(new passport_google_oauth20_1.Strategy({
-            clientID: splitAuth.gmailCredentials.clientId,
-            clientSecret: splitAuth.gmailCredentials.clientSecret,
-            callbackURL: '/auth/google/callback'
+            clientID: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            callbackURL: 'http://localhost:8080/auth/googleauth'
         }, (accessToken, refreshToken, profile, done) => __awaiter(this, void 0, void 0, function* () {
-            console.log(profile);
+            //  console.log(profile)
             try {
-                const user = yield splitAuth.googleSignInOrSignup(profile);
+                // console.log("model",UserModel.findOne({googleId: profile.id}).exec())
+                const user = UserModel_1.default.findOne({ email: profile.emails[0].value }).exec();
+                console.log("user found::", user);
+                if (!user) {
+                    const newUser = new UserModel_1.default({
+                        googleId: profile.id,
+                        name: profile.displayName,
+                        email: profile.emails[0].value
+                    });
+                    newUser.save();
+                    return done(null, newUser);
+                }
                 return done(null, user);
             }
-            catch (error) {
-                return done(error);
+            catch (err) {
+                console.error(err);
+                return done(err);
             }
         })));
         passport_1.default.serializeUser((user, done) => {
@@ -105,7 +118,7 @@ function main() {
             done(null, obj);
         });
         app.use((0, express_session_1.default)({
-            secret: 'fghj',
+            secret: secretString,
             resave: false,
             saveUninitialized: true
         }));
@@ -114,8 +127,11 @@ function main() {
         app.use(bodyParser.json());
         app.use(express_1.default.json());
         app.get("/auth/google", passport_1.default.authenticate("google", { scope: ["profile", "email"] }));
-        app.get("/auth/google/callback", passport_1.default.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
+        app.get("/auth/googleauth", passport_1.default.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
             res.redirect("/profile");
+        });
+        app.get("/profile", function (req, res) {
+            res.send("Welcome to dashboard");
         });
         app.post("/signup", (req, res) => __awaiter(this, void 0, void 0, function* () {
             const response = yield splitAuth.signup(req.body);
@@ -133,7 +149,7 @@ function main() {
             const response = yield splitAuth.resetPassword(req.body);
             res.send(response);
         }));
-        app.get("/data", [(req, res, next) => splitAuth.authenticate(req, res, next)], (req, res) => __awaiter(this, void 0, void 0, function* () {
+        app.get("/data", (req, res, next) => splitAuth.authenticate(req, res, next), (req, res) => __awaiter(this, void 0, void 0, function* () {
             res.send("ok");
         }));
         app.listen(port, function () {
