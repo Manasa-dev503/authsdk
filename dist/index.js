@@ -47,7 +47,7 @@ const UserModel_1 = __importDefault(require("./models/UserModel"));
 dotenv_1.default.config();
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
-        const connectionString = process.env.DB_CONNECTION_STRING || "mongodb://127.0.0.1:27017";
+        const connectionString = process.env.DB_CONNECTION_STRING || "mongodb+srv://admin:cdkpiLdQgBLwnnc7@cluster0.biojw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
         const dbName = process.env.DB_NAME || "auth-sdk";
         const secretString = process.env.SECRET_STRING || "defaultSecret";
         const dbInstance = yield new Promise((resolve, reject) => {

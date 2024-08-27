@@ -5,6 +5,7 @@ import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import SplitAuth from '@splitbitio/authy-sdk';
 import UserModel from './models/UserModel';
 
@@ -18,7 +19,7 @@ async function main() {
 
     const dbInstance: mongoose.Connection = await new Promise(
         (resolve, reject) => {
-            const db = mongoose.createConnection(connectionString, {
+            const db =  mongoose.createConnection(connectionString, {
                 dbName: dbName,
                 serverSelectionTimeoutMS:10000
             });
@@ -63,7 +64,7 @@ async function main() {
             refreshToken: process.env.GOOGLE_REFRESH_TOKEN!,
         },
     });
-
+    app.use(cors());
     passport.use(new GoogleStrategy({
         clientID: process.env.GOOGLE_CLIENT_ID!,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
